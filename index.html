@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Buckshot Roulette (Web)</title>
+<style>
+    body {
+        margin: 0;
+        background: #0b0b0b;
+        color: #e6e6e6;
+        font-family: monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    #game {
+        width: 420px;
+        background: #111;
+        border: 2px solid #333;
+        padding: 20px;
+    }
+
+    h1 {
+        text-align: center;
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+
+    .stats {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .log {
+        background: #050505;
+        border: 1px solid #333;
+        padding: 10px;
+        height: 120px;
+        overflow-y: auto;
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+
+    button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+        background: #222;
+        color: #eee;
+        border: 1px solid #444;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #333;
+    }
+
+    button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+</style>
+</head>
+<body>
+
+<div id="game">
+    <h1>BUCKSHOT ROULETTE</h1>
+
+    <div class="stats">
+        <div>YOU: <span id="playerHP">3</span></div>
+        <div>DEALER: <span id="dealerHP">3</span></div>
+    </div>
+
+    <div class="stats">
+        <div>SHELLS LEFT: <span id="shellsLeft">0</span></div>
+        <div>TURN: <span id="turn">YOU</span></div>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <button id="shootDealer">Shoot Dealer</button>
+    <button id="shootSelf">Shoot Yourself</button>
+</div>
+
+<script>
+let playerHP = 3;
+let dealerHP = 3;
+let shells = [];
+let currentTurn = "player";
+
+const logEl = document.getElementById("log");
+
+function log(text) {
+    logEl.innerHTML += text + "<br>";
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function updateUI() {
+    document.getElementById("playerHP").textContent = playerHP;
+    document.getElementById("dealerHP").textContent = dealerHP;
+    document.getElementById("shellsLeft").textContent = shells.length;
+    document.getElementById("turn").textContent =
+        currentTurn === "player" ? "YOU" : "DEALER";
+
+    document.getElementById("shootDealer").disabled = currentTurn !== "player";
+    document.getElementById("shootSelf").disabled = currentTurn !== "player";
+}
+
+function newRound() {
+    shells = [];
+    const liveCount = Math.floor(Math.random() * 3) + 2; // 2–4 live
+    const blankCount = Math.floor(Math.random() * 3) + 1; // 1–3 blank
+
+    for (let i = 0; i < liveCount; i++) shells.push("live");
+    for (let i = 0; i < blankCount; i++) shells.push("blank");
+
+    shells.sort(() => Math.random() - 0.5);
+
+    log("<hr>New round. Shotgun loaded.");
+    log(`(${liveCount} live, ${blankCount} blank)`);
+
+    currentTurn = "player";
+    updateUI();
+}
+
+function fire(target) {
+    const shell = shells.shift();
+    log(`Shot fired…`);
+
+    if (shell === "live") {
+        log("💥 LIVE ROUND");
+        if (target === "player") playerHP--;
+        else dealerHP--;
+    } else {
+        log("CLICK. Blank.");
+    }
+
+    if (playerHP <= 0) {
+        log("<b>You are dead.</b>");
+        endGame();
+        return;
+    }
+
+    if (dealerHP <= 0) {
+        log("<b>The dealer collapses.</b>");
+        endGame();
+        return;
+    }
+
+    if (shells.length === 0) {
+        newRound();
+        return;
+    }
+
+    currentTurn = currentTurn === "player" ? "dealer" : "player";
+    updateUI();
+
+    if (currentTurn === "dealer") {
+        setTimeout(dealerTurn, 900);
+    }
+}
+
+function dealerTurn() {
+    log("Dealer is thinking…");
+
+    const liveProbability = shells.filter(s => s === "live").length / shells.length;
+
+    // Dealer behavior similar to original:
+    // If odds are high → shoot player
+    // If odds are low → gamble on self
+    const target =
+        liveProbability > 0.5 ? "player" :
+        Math.random() < 0.6 ? "player" : "dealer";
+
+    log(`Dealer pulls the trigger.`);
+    fire(target);
+}
+
+function endGame() {
+    document.getElementById("shootDealer").disabled = true;
+    document.getElementById("shootSelf").disabled = true;
+}
+
+document.getElementById("shootDealer").onclick = () => fire("dealer");
+document.getElementById("shootSelf").onclick = () => fire("player");
+
+newRound();
+</script>
+
+</body>
+</html>
