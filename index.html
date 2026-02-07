@@ -1,194 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Buckshot Roulette (Web)</title>
+<meta charset="UTF-8">
+<title>Buckshot Roulette</title>
 <style>
-    body {
-        margin: 0;
-        background: #0b0b0b;
-        color: #e6e6e6;
-        font-family: monospace;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-    }
-
-    #game {
-        width: 420px;
-        background: #111;
-        border: 2px solid #333;
-        padding: 20px;
-    }
-
-    h1 {
-        text-align: center;
-        font-size: 20px;
-        margin-bottom: 10px;
-    }
-
-    .stats {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 10px;
-    }
-
-    .log {
-        background: #050505;
-        border: 1px solid #333;
-        padding: 10px;
-        height: 120px;
-        overflow-y: auto;
-        font-size: 12px;
-        margin-bottom: 10px;
-    }
-
-    button {
-        width: 100%;
-        padding: 10px;
-        margin-top: 5px;
-        background: #222;
-        color: #eee;
-        border: 1px solid #444;
-        cursor: pointer;
-    }
-
-    button:hover {
-        background: #333;
-    }
-
-    button:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-    }
+body{background:#0b0b0b;color:#eee;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
+#game{width:520px;background:#111;border:2px solid #333;padding:14px}
+h1{text-align:center;margin:6px 0}
+.stats,.items{display:flex;justify-content:space-between;margin-bottom:6px;gap:4px}
+.items button{flex:1;font-size:11px}
+.log{background:#050505;border:1px solid #333;height:160px;padding:6px;font-size:12px;overflow-y:auto;margin-bottom:6px}
+button{background:#222;border:1px solid #444;color:#eee;padding:6px;cursor:pointer}
+button:hover{background:#333}
+button:disabled{opacity:.4}
 </style>
 </head>
 <body>
 
 <div id="game">
-    <h1>BUCKSHOT ROULETTE</h1>
+<h1>BUCKSHOT ROULETTE</h1>
 
-    <div class="stats">
-        <div>YOU: <span id="playerHP">3</span></div>
-        <div>DEALER: <span id="dealerHP">3</span></div>
-    </div>
+<div class="stats">
+<div>YOU: <span id="pHP">3</span></div>
+<div>DEALER: <span id="dHP">3</span></div>
+</div>
 
-    <div class="stats">
-        <div>SHELLS LEFT: <span id="shellsLeft">0</span></div>
-        <div>TURN: <span id="turn">YOU</span></div>
-    </div>
+<div class="stats">
+<div>SHELLS: <span id="shells">0</span></div>
+<div>TURN: <span id="turn">YOU</span></div>
+</div>
 
-    <div class="log" id="log"></div>
+<div class="items" id="playerItems"></div>
 
-    <button id="shootDealer">Shoot Dealer</button>
-    <button id="shootSelf">Shoot Yourself</button>
+<div class="log" id="log"></div>
+
+<button id="shootDealer">Shoot Dealer</button>
+<button id="shootSelf">Shoot Yourself</button>
 </div>
 
 <script>
-let playerHP = 3;
-let dealerHP = 3;
-let shells = [];
-let currentTurn = "player";
+let maxHP=3,pHP=3,dHP=3;
+let shells=[],turn="player";
+let sawP=false,sawD=false,skipPlayer=false,skipDealer=false;
 
-const logEl = document.getElementById("log");
+const icons={
+glass:"🔍",beer:"🍺",saw:"🪚",cuffs:"⛓",cigs:"🚬",
+pills:"💉",adrenaline:"⚡",inverter:"🔄"
+};
 
-function log(text) {
-    logEl.innerHTML += text + "<br>";
-    logEl.scrollTop = logEl.scrollHeight;
+let pItems={glass:1,beer:1,saw:1,cuffs:1,cigs:1,pills:1,adrenaline:1,inverter:1};
+let dItems={glass:1,beer:1,saw:1,cuffs:1,cigs:1,pills:1,adrenaline:1,inverter:1};
+
+const logEl=document.getElementById("log");
+const pHPEl=pHP=document.getElementById("pHP");
+const dHPEl=document.getElementById("dHP");
+const shellsEl=document.getElementById("shells");
+const turnEl=document.getElementById("turn");
+
+function log(t){logEl.innerHTML+=t+"<br>";logEl.scrollTop=logEl.scrollHeight}
+
+function updateUI(){
+document.getElementById("pHP").textContent=pHP;
+document.getElementById("dHP").textContent=dHP;
+shellsEl.textContent=shells.length;
+turnEl.textContent=turn==="player"?"YOU":"DEALER";
+shootDealer.disabled=shootSelf.disabled=turn!=="player";
+renderItems();
+if(pHP<=0||dHP<=0)endGame();
 }
 
-function updateUI() {
-    document.getElementById("playerHP").textContent = playerHP;
-    document.getElementById("dealerHP").textContent = dealerHP;
-    document.getElementById("shellsLeft").textContent = shells.length;
-    document.getElementById("turn").textContent =
-        currentTurn === "player" ? "YOU" : "DEALER";
-
-    document.getElementById("shootDealer").disabled = currentTurn !== "player";
-    document.getElementById("shootSelf").disabled = currentTurn !== "player";
+function renderItems(){
+const wrap=document.getElementById("playerItems");
+wrap.innerHTML="";
+for(let k in pItems){
+let b=document.createElement("button");
+b.textContent=icons[k]+" x"+pItems[k];
+b.disabled=pItems[k]<=0||turn!=="player";
+b.onclick=()=>usePlayerItem(k);
+wrap.appendChild(b);
+}
 }
 
-function newRound() {
-    shells = [];
-    const liveCount = Math.floor(Math.random() * 3) + 2; // 2–4 live
-    const blankCount = Math.floor(Math.random() * 3) + 1; // 1–3 blank
-
-    for (let i = 0; i < liveCount; i++) shells.push("live");
-    for (let i = 0; i < blankCount; i++) shells.push("blank");
-
-    shells.sort(() => Math.random() - 0.5);
-
-    log("<hr>New round. Shotgun loaded.");
-    log(`(${liveCount} live, ${blankCount} blank)`);
-
-    currentTurn = "player";
-    updateUI();
+function newRound(){
+shells=[];
+let l=Math.floor(Math.random()*3)+2,b=Math.floor(Math.random()*3)+1;
+while(l--)shells.push("live");while(b--)shells.push("blank");
+shells.sort(()=>Math.random()-.5);
+log("<hr>Shotgun reloaded.");
+turn="player";
+updateUI();
 }
 
-function fire(target) {
-    const shell = shells.shift();
-    log(`Shot fired…`);
+function fire(target){
+let s=shells.shift();
+let dmg=1;
+if(s==="live"){
+if(target==="player"&&sawD||target==="dealer"&&sawP)dmg=2;
+log("💥 LIVE ("+dmg+")");
+target==="player"?pHP-=dmg:dHP-=dmg;
+}else log("CLICK.");
+sawP=sawD=false;
 
-    if (shell === "live") {
-        log("💥 LIVE ROUND");
-        if (target === "player") playerHP--;
-        else dealerHP--;
-    } else {
-        log("CLICK. Blank.");
-    }
+if(shells.length===0)newRound();
+else turn=turn==="player"?"dealer":"player";
 
-    if (playerHP <= 0) {
-        log("<b>You are dead.</b>");
-        endGame();
-        return;
-    }
-
-    if (dealerHP <= 0) {
-        log("<b>The dealer collapses.</b>");
-        endGame();
-        return;
-    }
-
-    if (shells.length === 0) {
-        newRound();
-        return;
-    }
-
-    currentTurn = currentTurn === "player" ? "dealer" : "player";
-    updateUI();
-
-    if (currentTurn === "dealer") {
-        setTimeout(dealerTurn, 900);
-    }
+updateUI();
+if(turn==="dealer")setTimeout(dealerTurn,800);
 }
 
-function dealerTurn() {
-    log("Dealer is thinking…");
+function dealerTurn(){
+log("Dealer thinks...");
+if(dHP===1&&dItems.pills){
+dItems.pills--;
+if(Math.random()<.5){dHP+=2;log("💉 Dealer heals.");}
+else{dHP--;log("💉 Dealer convulses.");}
+}
+if(dHP===1&&dItems.cigs){dItems.cigs--;dHP++;log("🚬 Dealer smokes.");}
 
-    const liveProbability = shells.filter(s => s === "live").length / shells.length;
-
-    // Dealer behavior similar to original:
-    // If odds are high → shoot player
-    // If odds are low → gamble on self
-    const target =
-        liveProbability > 0.5 ? "player" :
-        Math.random() < 0.6 ? "player" : "dealer";
-
-    log(`Dealer pulls the trigger.`);
-    fire(target);
+if(dItems.adrenaline&&Object.values(pItems).some(v=>v>0)){
+dItems.adrenaline--;
+let keys=Object.keys(pItems).filter(k=>pItems[k]>0);
+let steal=keys[Math.floor(Math.random()*keys.length)];
+pItems[steal]--;dItems[steal]++;
+log("⚡ Dealer steals an item.");
 }
 
-function endGame() {
-    document.getElementById("shootDealer").disabled = true;
-    document.getElementById("shootSelf").disabled = true;
+if(dItems.glass){
+dItems.glass--;
+let peek=shells[0];
+log("🔍 Dealer checks chamber.");
+if(dItems.inverter){
+dItems.inverter--;
+shells[0]=peek==="live"?"blank":"live";
+log("🔄 Dealer flips the shell.");
+peek=shells[0];
+}
+if(peek==="live"&&dItems.saw&&pHP<=2){
+dItems.saw--;sawD=true;log("🪚 Dealer modifies shotgun.");
+}
+fire(peek==="live"?"player":"dealer");
+return;
 }
 
-document.getElementById("shootDealer").onclick = () => fire("dealer");
-document.getElementById("shootSelf").onclick = () => fire("player");
+let liveChance=shells.filter(s=>s==="live").length/shells.length;
+if(liveChance>.5&&dItems.beer){
+dItems.beer--;shells.shift();log("🍺 Dealer ejects shell.");
+turn="player";updateUI();return;
+}
+
+fire(liveChance>.5?"player":Math.random()<.6?"player":"dealer");
+}
+
+function usePlayerItem(k){
+pItems[k]--;
+if(k==="glass")log("🔍 Next shell: "+shells[0].toUpperCase());
+if(k==="beer"){log("🍺 Ejected: "+shells.shift().toUpperCase());}
+if(k==="saw"){sawP=true;log("🪚 Shotgun modified.");}
+if(k==="cuffs"){skipDealer=true;log("⛓ Dealer restrained.");}
+if(k==="cigs"){pHP++;log("🚬 +1 HP.");}
+if(k==="pills"){
+if(Math.random()<.5){pHP+=2;log("💉 You feel better.");}
+else{pHP--;log("💉 You feel worse.");}
+}
+if(k==="adrenaline"){
+let keys=Object.keys(dItems).filter(x=>dItems[x]>0);
+if(keys.length){
+let steal=keys[Math.floor(Math.random()*keys.length)];
+dItems[steal]--;pItems[steal]++;
+log("⚡ You steal an item.");
+}else log("⚡ Nothing happens.");
+}
+if(k==="inverter"){
+shells[0]=shells[0]==="live"?"blank":"live";
+log("🔄 Shell inverted.");
+}
+updateUI();
+}
+
+function endGame(){
+document.querySelectorAll("button").forEach(b=>b.disabled=true);
+}
+
+shootDealer.onclick=()=>fire("dealer");
+shootSelf.onclick=()=>fire("player");
 
 newRound();
 </script>
-
 </body>
 </html>
